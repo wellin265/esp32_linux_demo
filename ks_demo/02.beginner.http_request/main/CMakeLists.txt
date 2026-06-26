@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS
+        "http_request_example_main.c"
+    INCLUDE_DIRS
+        "."
+    PRIV_REQUIRES
+        esp_event
+        esp_netif
+        esp_wifi
+        nvs_flash
+        protocol_examples_common
+        ksdiy_example_display
+)

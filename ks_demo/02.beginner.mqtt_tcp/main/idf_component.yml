@@ -1,0 +1,11 @@
+dependencies:
+  protocol_examples_common:
+    path: ${IDF_PATH}/examples/common_components/protocol_examples_common
+  espressif/esp_wifi_remote:
+    version: ">=0.1.12"
+    rules:
+      - if: "target in [esp32p4, esp32h2]"
+  lvgl/lvgl: "^9.4.0"
+  esp_lcd_touch_cst816s: "^1.0"
+  esp_io_expander_tca9554: "^2.0.0"
+  espressif/esp_lvgl_adapter: ^0.2.0

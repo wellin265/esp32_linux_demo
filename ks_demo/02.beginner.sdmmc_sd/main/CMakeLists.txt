@@ -1,0 +1,11 @@
+idf_component_register(
+    SRCS
+        "sd_mmc_example_main.c"
+    INCLUDE_DIRS
+        "."
+    PRIV_REQUIRES
+        fatfs
+        sdmmc
+        esp_driver_sdmmc
+        ksdiy_example_display
+)

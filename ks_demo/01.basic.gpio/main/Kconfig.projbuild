@@ -1,0 +1,5 @@
+menu "Example Configuration"
+
+    comment "This demo uses fixed pins: IO5 input, IO19/IO20 outputs"
+
+endmenu

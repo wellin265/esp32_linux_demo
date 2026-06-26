@@ -1,0 +1,14 @@
+# IDE
+.vscode/
+
+# ESP-IDF build outputs
+build/
+
+# ESP-IDF managed components
+managed_components/
+
+# Clangd
+.clangd
+
+# CMake cache
+.cache/

@@ -1,0 +1,12 @@
+idf_component_register(
+    SRCS
+        "ksdiy_lvgl_port.c"
+        "ksdiy_example_display.c"
+    INCLUDE_DIRS
+        "."
+    PRIV_REQUIRES
+        lvgl
+        esp_lcd_touch_cst816s
+        esp_io_expander_tca9554
+        esp_lvgl_adapter
+)

@@ -1,0 +1,10 @@
+idf_component_register(
+    SRC_DIRS
+        "."
+        "APP"
+        "APP/FREERTOS_DEMO"
+    INCLUDE_DIRS
+        "."
+        "APP"
+        "APP/FREERTOS_DEMO"
+        )

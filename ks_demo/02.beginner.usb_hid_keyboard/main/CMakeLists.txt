@@ -1,0 +1,11 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "usb_osal_freertos_esp.c"
+        "usbx_demo.c"
+    INCLUDE_DIRS
+        "."
+    PRIV_REQUIRES
+        esp_netif
+        ksdiy_example_display
+)

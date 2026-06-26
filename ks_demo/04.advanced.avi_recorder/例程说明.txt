@@ -1,0 +1,21 @@
+本例程是 录制视频AVI文件存到TF卡
+
+
+	app_camera_init();//初始化摄像头
+	avi_recorder_start("/sdcard/recorde.avi", FRAMESIZE_SVGA, 10*3,1);//录制一个30秒的视频到/sdcard/recorde.avi
+	while (1)
+	{
+		/* Delay 1 tick (assumes FreeRTOS tick is 10ms */
+		vTaskDelay(pdMS_TO_TICKS(10));
+
+		/* Try to take the semaphore, call lvgl related function on success */
+		if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY))
+		{
+
+			lv_task_handler();
+			xSemaphoreGive(xGuiSemaphore);
+		}
+	}
+
+
+需要插上TF卡

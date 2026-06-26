@@ -1,0 +1,10 @@
+idf_component_register(
+    SRCS
+        "softap_example_main.c"
+    PRIV_REQUIRES
+        esp_wifi
+        nvs_flash
+        ksdiy_example_display
+    INCLUDE_DIRS
+        "."
+)

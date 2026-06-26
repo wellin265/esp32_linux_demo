@@ -1,0 +1,11 @@
+dependencies:
+  idf: ">=4.4"
+  espressif/esp32-camera: "^2.0.13"
+  espressif/esp-dl: "^3.1.0"
+  espressif/cat_detect: "^0.2.1"
+  espressif/human_face_detect: "^0.4.1"
+  espressif/human_face_recognition: "^0.3.1"
+  lvgl/lvgl: "^9.4.0"
+  esp_lcd_touch_cst816s: "^1.0"
+  esp_io_expander_tca9554: "^2.0.0"
+  espressif/esp_lvgl_adapter: ^0.2.0
