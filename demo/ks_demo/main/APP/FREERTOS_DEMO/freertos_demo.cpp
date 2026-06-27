@@ -2,134 +2,39 @@
  * FreeRTOS 测试任务
  *
  * messageTask:   系统信息打印 (芯片型号/FLASH/PSRAM/任务列表)
- * lcdDemoTask:   LCD 图形演示 (色条/几何图形/触摸轨迹)
- * touchTask:     CST816S 触摸轮询 (每 50ms 读取坐标)
+ * ledTask:       LED 闪烁 (TCA9554 P6/P7, 1s 周期)
  */
 
 #include "freertos_demo.hpp"
 #include <stdio.h>
 #include "esp_chip_info.h"
 #include "esp_flash.h"
+#include "esp_io_expander.h"
 #include "esp_psram.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lcd.hpp"
+#include "tca9554.hpp"
 #include "cst816s.hpp"
-
-/* 触摸数据 (任务间共享) */
-static volatile int16_t  g_touch_x = -1;
-static volatile int16_t  g_touch_y = -1;
-static volatile bool     g_touch_detected = false;
 
 /* message_task 配置 */
 #define MESSAGE_PRIO       1
 #define MESSAGE_STK_SIZE   3 * 1024
 
-/* lcd_demo_task 配置 */
-#define LCD_DEMO_PRIO      2
-#define LCD_DEMO_STK_SIZE  4 * 1024
+/* led_task 配置 */
+#define LED_PRIO           1
+#define LED_STK_SIZE       3 * 1024
 
-/* touch_task 配置 */
-#define TOUCH_PRIO         3
-#define TOUCH_STK_SIZE     2 * 1024
+/* 文件作用域: 设备对象 (多任务共享, freertos_demo 返回后仍存活) */
+static MyIic     g_i2c(GPIO_NUM_17, GPIO_NUM_18);
+static MySpi     g_spi(GPIO_NUM_0, GPIO_NUM_1);
+static Tca9554  *g_tca9554 = nullptr;   /* 延迟构造 (需要 g_i2c 先 init) */
+static Lcd      *g_lcd = nullptr;
+static Cst816s  *g_touch = nullptr;
 
-static TaskHandle_t MessageTask_Handler  = nullptr;
-static TaskHandle_t LcdDemoTask_Handler  = nullptr;
-static TaskHandle_t TouchTask_Handler    = nullptr;
-
-/* 触摸轮询任务: 每 50ms 读取 CST816S */
-static void touchTask(void *pvParameters) {
-    const char *TAG = "touch";
-    ESP_LOGI(TAG, "Touch task started");
-
-    uint16_t x = 0, y = 0;
-    uint8_t num = 0;
-
-    while (1) {
-        Cst816s::inst().readData();
-        if (Cst816s::inst().getPoint(&x, &y, &num) == ESP_OK && num > 0) {
-            g_touch_x = x;
-            g_touch_y = y;
-            g_touch_detected = true;
-        } else {
-            g_touch_detected = false;
-        }
-        vTaskDelay(pdMS_TO_TICKS(50));
-    }
-}
-
-/* LCD 演示任务: 显示图形 + 触摸坐标与轨迹 */
-static void lcdDemoTask(void *pvParameters) {
-    const char *TAG = "lcd_demo";
-    ESP_LOGI(TAG, "LCD demo task started");
-
-    /* ---- 清屏 ---- */
-    lcd_clear(WHITE);
-
-    /* ---- 顶部色条 (6 色) ---- */
-    uint16_t colors[] = {RED, GREEN, BLUE, CYAN, MAGENTA, YELLOW};
-    uint16_t bar_w = lcd_dev.width / 6;
-    for (int i = 0; i < 6; i++) {
-        lcd_fill(i * bar_w, 0, (i + 1) * bar_w - 1, 24, colors[i]);
-    }
-
-    /* ---- 标题 ---- */
-    lcd_show_string(5, 30, lcd_dev.width - 10, 20,
-                    12, (char *)"ST7789 SPI LCD", BLUE);
-    lcd_show_string(5, 46, lcd_dev.width - 10, 20,
-                    12, (char *)"ESP32-S3 + CST816S", GRAY);
-
-    /* ---- 几何图形 ---- */
-    lcd_draw_rectangle(4, 65, 70, 115, RED);
-    lcd_draw_circle(130, 90, 25, GREEN);
-    lcd_draw_line(175, 65, 270, 115, BLUE);
-    lcd_show_string(12, 75, 55, 20, 12, (char *)"RECT", BLACK);
-
-    /* ---- 触摸区域分隔线 ---- */
-    lcd_draw_hline(0, 128, lcd_dev.width, GRAY);
-
-    /* ---- 触摸状态提示 ---- */
-    lcd_show_string(5, 135, lcd_dev.width - 10, 20,
-                    12, (char *)"Touch: waiting...", DARKBLUE);
-
-    char buf[48];
-    uint16_t last_x = 0xFFFF, last_y = 0xFFFF;
-    uint8_t refresh_cnt = 0;
-
-    while (1) {
-        if (g_touch_detected) {
-            /* 更新坐标文字 */
-            snprintf(buf, sizeof(buf), "X: %-3d  Y: %-3d    ", g_touch_x, g_touch_y);
-            lcd_fill(5, 152, lcd_dev.width - 5, 170, WHITE);
-            lcd_show_string(5, 152, lcd_dev.width - 10, 20, 16, buf, BLACK);
-
-            /* 触摸轨迹绘制 */
-            if (g_touch_x < lcd_dev.width && g_touch_y < lcd_dev.height) {
-                lcd_draw_point(g_touch_x, g_touch_y, RED);
-                if (last_x < lcd_dev.width && last_y < lcd_dev.height) {
-                    lcd_draw_line(last_x, last_y, g_touch_x, g_touch_y, BLUE);
-                }
-                last_x = g_touch_x;
-                last_y = g_touch_y;
-            }
-        } else {
-            /* 手指抬起，重置轨迹 */
-            last_x = 0xFFFF;
-            last_y = 0xFFFF;
-
-            /* 每 1s 刷新等待提示 */
-            if (++refresh_cnt >= 50) {
-                refresh_cnt = 0;
-                lcd_fill(5, 135, lcd_dev.width - 5, 170, WHITE);
-                lcd_show_string(5, 135, lcd_dev.width - 10, 20,
-                                12, (char *)"Touch: waiting...", DARKBLUE);
-            }
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
+static TaskHandle_t MessageTask_Handler = nullptr;
+static TaskHandle_t LedTask_Handler     = nullptr;
 
 /* 系统信息任务 */
 static void messageTask(void *pvParameters) {
@@ -184,19 +89,67 @@ static void messageTask(void *pvParameters) {
     }
 }
 
+/* LED 闪烁任务 */
+static void ledTask(void *pvParameters) {
+    const char *TAG = "led_task";
+    ESP_LOGI(TAG, "LED task started, P6+P7 blinking 1s");
+
+    g_tca9554->pinSetDir(TCA9554_PIN_6, IO_EXPANDER_OUTPUT);
+    g_tca9554->pinSetDir(TCA9554_PIN_7, IO_EXPANDER_OUTPUT);
+    while (1) {
+        g_tca9554->pinSetLevel(TCA9554_PIN_6, 0);
+        g_tca9554->pinSetLevel(TCA9554_PIN_7, 0);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        g_tca9554->pinSetLevel(TCA9554_PIN_6, 1);
+        g_tca9554->pinSetLevel(TCA9554_PIN_7, 1);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 extern "C" {
 
 void freertos_demo(void) {
+    /* 1. 初始化 I2C / SPI 总线 */
+    g_i2c.init();
+    g_spi.init();
+
+    /* 2. 构造设备对象 (需要总线先 init) */
+    static Tca9554 tca(g_i2c);
+    static Lcd      lcd(g_spi);
+    static Cst816s  touch(g_i2c);
+    g_tca9554 = &tca;
+    g_lcd     = &lcd;
+    g_touch   = &touch;
+
+    /* 3. 初始化 TCA9554 */
+    g_tca9554->init();
+
+    /* 4. 硬件复位 LCD + Touch */
+    g_tca9554->pinSetLevel(TCA9554_PIN_EN, 0);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    g_tca9554->pinSetLevel(TCA9554_PIN_EN, 1);
+    vTaskDelay(pdMS_TO_TICKS(200));
+
+    /* 5. 初始化 LCD + 触摸 */
+    lcd_cfg_t lcd_config = {};
+    g_lcd->init(lcd_config);
+
+    g_touch->setConfig(Cst816sConfig{
+        .x_max = lcd_dev.pwidth,
+        .y_max = lcd_dev.pheight,
+    });
+    g_touch->init();
+
+    g_lcd->showString(10, 10, 280, 30, 32, "hello world", RED);
 
     /* --- 创建任务 --- */
     xTaskCreatePinnedToCore(reinterpret_cast<TaskFunction_t>(messageTask), "message_task",
-                            MESSAGE_STK_SIZE, nullptr, MESSAGE_PRIO, &MessageTask_Handler, 0);
+                            MESSAGE_STK_SIZE, nullptr, MESSAGE_PRIO,
+                            &MessageTask_Handler, 0);
 
-    xTaskCreatePinnedToCore(reinterpret_cast<TaskFunction_t>(touchTask), "touch_task",
-                            TOUCH_STK_SIZE, nullptr, TOUCH_PRIO, &TouchTask_Handler, 0);
-
-    xTaskCreatePinnedToCore(reinterpret_cast<TaskFunction_t>(lcdDemoTask), "lcd_demo_task",
-                            LCD_DEMO_STK_SIZE, nullptr, LCD_DEMO_PRIO, &LcdDemoTask_Handler, 0);
+    xTaskCreatePinnedToCore(reinterpret_cast<TaskFunction_t>(ledTask), "led_task",
+                            LED_STK_SIZE, nullptr, LED_PRIO,
+                            &LedTask_Handler, 0);
 }
 
 }

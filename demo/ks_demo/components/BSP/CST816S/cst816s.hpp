@@ -11,11 +11,22 @@
 
 #include "myiic.hpp"
 #include "esp_lcd_touch.h"
+#include "esp_lcd_touch_cst816s.h"
 
-class Cst816s : public MyIic {
+struct Cst816sConfig {
+    uint8_t i2c_addr = ESP_LCD_TOUCH_IO_I2C_CST816S_ADDRESS;
+    gpio_num_t rst_io = GPIO_NUM_NC;
+    gpio_num_t int_io = GPIO_NUM_NC;
+    uint16_t x_max = 280;
+    uint16_t y_max = 240;
+    uint8_t default_rotation = 1;  // 横屏
+};
+
+class Cst816s {
 public:
-    static Cst816s& inst();
-    esp_err_t init(uint16_t x_max, uint16_t y_max);
+    Cst816s(MyIic &i2c, const Cst816sConfig &dev_cfg = {});
+    esp_err_t init();
+    void setConfig(const Cst816sConfig &cfg) { m_dev_cfg = cfg; }
     esp_err_t readData();
     esp_err_t getPoint(uint16_t *x, uint16_t *y, uint8_t *num);
     void setRotation(uint8_t rot);
@@ -23,7 +34,8 @@ public:
     esp_lcd_touch_handle_t handle() const { return tp_handle; }
 
 private:
-    Cst816s() = default;
+    MyIic &m_i2c;
+    Cst816sConfig m_dev_cfg;
     esp_lcd_touch_handle_t tp_handle = nullptr;
 };
 

@@ -6,9 +6,20 @@
 #include "esp_io_expander_tca9554.h"
 #include "esp_err.h"
 
-/* TCA9554(A) I2C 地址 (A0/A1/A2 全接 GND) — 先试 TCA9554 再试 TCA9554A */
-#define TCA9554_I2C_ADDR        ESP_IO_EXPANDER_I2C_TCA9554_ADDRESS_000
-#define TCA9554A_I2C_ADDR       ESP_IO_EXPANDER_I2C_TCA9554A_ADDRESS_000
+/* TCA9554(A) I2C 地址 (A0/A1/A2 全接 GND) — 先试 TCA9554 再试 TCA9554A
+ * 默认值已移至 Tca9554Config 结构体:
+ *   i2c_addr=ESP_IO_EXPANDER_I2C_TCA9554_ADDRESS_000
+ *   i2c_addr_fallback=ESP_IO_EXPANDER_I2C_TCA9554A_ADDRESS_000
+ *   power_pins=IO_EXPANDER_PIN_NUM_1 | IO_EXPANDER_PIN_NUM_2
+// #define TCA9554_I2C_ADDR        ESP_IO_EXPANDER_I2C_TCA9554_ADDRESS_000
+// #define TCA9554A_I2C_ADDR       ESP_IO_EXPANDER_I2C_TCA9554A_ADDRESS_000
+ */
+
+struct Tca9554Config {
+    uint8_t i2c_addr = ESP_IO_EXPANDER_I2C_TCA9554_ADDRESS_000;
+    uint8_t i2c_addr_fallback = ESP_IO_EXPANDER_I2C_TCA9554A_ADDRESS_000;
+    uint32_t power_pins = IO_EXPANDER_PIN_NUM_1 | IO_EXPANDER_PIN_NUM_2;
+};
 
 /* TCA9554 引脚定义 */
 #define TCA9554_PIN_0           IO_EXPANDER_PIN_NUM_0
@@ -32,9 +43,9 @@
 #define TCA9554_PIN_BLK         TCA9554_PIN_PWR /* 兼容旧名: 供电使能 */
 #define TCA9554_PIN_RST         TCA9554_PIN_EN  /* 兼容旧名: 使能信号 */
 
-class Tca9554 : public MyIic {
+class Tca9554 {
 public:
-    static Tca9554& inst();
+    Tca9554(MyIic &i2c, const Tca9554Config &dev_cfg = {});
     esp_err_t init();
     esp_err_t pinSetLevel(uint32_t pin_mask, uint8_t level);
     esp_err_t pinGetLevel(uint32_t pin_mask, uint32_t *level);
@@ -42,7 +53,8 @@ public:
     esp_io_expander_handle_t handle() const;
 
 private:
-    Tca9554() = default;
+    MyIic &m_i2c;
+    Tca9554Config m_dev_cfg;
     esp_io_expander_handle_t expander_handle = nullptr;
 };
 

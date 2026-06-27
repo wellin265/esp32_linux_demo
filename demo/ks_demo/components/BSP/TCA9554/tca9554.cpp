@@ -19,38 +19,37 @@
 
 static const char *TAG = "TCA9554";
 
-Tca9554& Tca9554::inst() { static Tca9554 t; return t; }
+Tca9554::Tca9554(MyIic &i2c, const Tca9554Config &dev_cfg)
+    : m_i2c(i2c), m_dev_cfg(dev_cfg) {}
 
 esp_err_t Tca9554::init() {
     if (expander_handle != nullptr) return ESP_OK;
 
-    /* 确保 I2C 总线已初始化 */
-    MyIic::init();
-
     /* 参考项目: 先试 TCA9554 (0x20), 再试 TCA9554A (0x38) */
-    ESP_LOGI(TAG, "Trying TCA9554 at 0x%02X...", TCA9554_I2C_ADDR);
-    esp_err_t ret = esp_io_expander_new_i2c_tca9554(s_bus_handle, TCA9554_I2C_ADDR, &expander_handle);
+    i2c_master_bus_handle_t bus_handle = m_i2c.handle();
+    ESP_LOGI(TAG, "Trying TCA9554 at 0x%02X...", m_dev_cfg.i2c_addr);
+    esp_err_t ret = esp_io_expander_new_i2c_tca9554(bus_handle, m_dev_cfg.i2c_addr, &expander_handle);
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "TCA9554 not found, trying TCA9554A at 0x%02X...", TCA9554A_I2C_ADDR);
-        ret = esp_io_expander_new_i2c_tca9554(s_bus_handle, TCA9554A_I2C_ADDR, &expander_handle);
+        ESP_LOGW(TAG, "TCA9554 not found, trying TCA9554A at 0x%02X...", m_dev_cfg.i2c_addr_fallback);
+        ret = esp_io_expander_new_i2c_tca9554(bus_handle, m_dev_cfg.i2c_addr_fallback, &expander_handle);
     }
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "No IO expander found, continuing without it");
         return ESP_OK;
     }
 
-    /* 参考项目: P1 + P2 都设为 OUTPUT 并直接 HIGH (电源/背光使能) */
+    /* 参考项目: 上电引脚 (默认 P1+P2) 都设为 OUTPUT 并直接 HIGH */
     ret = esp_io_expander_set_dir(expander_handle,
-        TCA9554_PIN_BLK | TCA9554_PIN_RST,
+        m_dev_cfg.power_pins,
         IO_EXPANDER_OUTPUT);
     ESP_ERROR_CHECK(ret);
 
     ret = esp_io_expander_set_level(expander_handle,
-        TCA9554_PIN_BLK | TCA9554_PIN_RST, 1);
+        m_dev_cfg.power_pins, 1);
     ESP_ERROR_CHECK(ret);
 
     tca9554_handle = expander_handle;
-    ESP_LOGI(TAG, "IO expander initialized, P1+P2=HIGH");
+    ESP_LOGI(TAG, "IO expander initialized, power pins HIGH");
     return ESP_OK;
 }
 
@@ -72,16 +71,20 @@ esp_io_expander_handle_t tca9554_handle = nullptr;
 
 extern "C" {
 
+static MyIic g_i2c;
+static Tca9554 g_tca9554(g_i2c);
+
 esp_err_t tca9554_init(void) {
-    return Tca9554::inst().init();
+    g_i2c.init();
+    return g_tca9554.init();
 }
 
 esp_err_t tca9554_pin_set_level(uint32_t pin_mask, uint8_t level) {
-    return Tca9554::inst().pinSetLevel(pin_mask, level);
+    return g_tca9554.pinSetLevel(pin_mask, level);
 }
 
 esp_err_t tca9554_pin_get_level(uint32_t pin_mask, uint32_t *level) {
-    return Tca9554::inst().pinGetLevel(pin_mask, level);
+    return g_tca9554.pinGetLevel(pin_mask, level);
 }
 
 }

@@ -13,17 +13,15 @@
 
 static const char *TAG = "CST816S";
 
-Cst816s& Cst816s::inst() { static Cst816s c; return c; }
+Cst816s::Cst816s(MyIic &i2c, const Cst816sConfig &dev_cfg)
+    : m_i2c(i2c), m_dev_cfg(dev_cfg) {}
 
-esp_err_t Cst816s::init(uint16_t x_max, uint16_t y_max) {
+esp_err_t Cst816s::init() {
     if (tp_handle != nullptr) return ESP_OK;
-
-    /* 确保 I2C 总线已初始化 */
-    MyIic::init();
 
     /* I2C 设备配置: CST816S 地址 0x15, 时钟 100kHz */
     esp_lcd_panel_io_i2c_config_t io_config = {};
-    io_config.dev_addr = ESP_LCD_TOUCH_IO_I2C_CST816S_ADDRESS;
+    io_config.dev_addr = m_dev_cfg.i2c_addr;
     io_config.scl_speed_hz = 100000;
     io_config.control_phase_bytes = 1;
     io_config.dc_bit_offset = 0;
@@ -33,21 +31,21 @@ esp_err_t Cst816s::init(uint16_t x_max, uint16_t y_max) {
     io_config.flags.disable_control_phase = 1;
 
     esp_lcd_panel_io_handle_t io_handle = nullptr;
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(s_bus_handle, &io_config, &io_handle));
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(m_i2c.handle(), &io_config, &io_handle));
 
     /* 触摸面板配置 */
     esp_lcd_touch_config_t tp_config = {};
-    tp_config.x_max = x_max;
-    tp_config.y_max = y_max;
-    tp_config.rst_gpio_num = GPIO_NUM_NC;
-    tp_config.int_gpio_num = GPIO_NUM_NC;
+    tp_config.x_max = m_dev_cfg.x_max;
+    tp_config.y_max = m_dev_cfg.y_max;
+    tp_config.rst_gpio_num = m_dev_cfg.rst_io;
+    tp_config.int_gpio_num = m_dev_cfg.int_io;
     tp_config.levels.reset = 0;
     tp_config.levels.interrupt = 0;
 
     ESP_ERROR_CHECK(esp_lcd_touch_new_i2c_cst816s(io_handle, &tp_config, &tp_handle));
 
     /* 初始方向: 横屏 */
-    setRotation(1);
+    setRotation(m_dev_cfg.default_rotation);
 
     ESP_LOGI(TAG, "CST816S initialized");
     return ESP_OK;
@@ -96,20 +94,28 @@ esp_err_t Cst816s::getPoint(uint16_t *x, uint16_t *y, uint8_t *num) {
 
 extern "C" {
 
+static MyIic g_cst816s_i2c;
+static Cst816s g_cst816s(g_cst816s_i2c);
+
 esp_err_t cst816s_init(uint16_t x_max, uint16_t y_max) {
-    return Cst816s::inst().init(x_max, y_max);
+    g_cst816s_i2c.init();
+    Cst816sConfig cfg;
+    cfg.x_max = x_max;
+    cfg.y_max = y_max;
+    g_cst816s.setConfig(cfg);
+    return g_cst816s.init();
 }
 
 esp_err_t cst816s_read_data(void) {
-    return Cst816s::inst().readData();
+    return g_cst816s.readData();
 }
 
 esp_err_t cst816s_get_point(uint16_t *x, uint16_t *y, uint8_t *num) {
-    return Cst816s::inst().getPoint(x, y, num);
+    return g_cst816s.getPoint(x, y, num);
 }
 
 void cst816s_set_rotation(uint8_t rot) {
-    Cst816s::inst().setRotation(rot);
+    g_cst816s.setRotation(rot);
 }
 
 }

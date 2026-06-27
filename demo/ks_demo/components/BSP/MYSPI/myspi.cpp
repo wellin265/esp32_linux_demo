@@ -9,25 +9,32 @@
 
 bool MySpi::s_initialized = false;
 
-MySpi& MySpi::inst() { static MySpi s; return s; }
+MySpi::MySpi(const SpiBusConfig &cfg)
+    : m_cfg(cfg) {}
+
+MySpi::MySpi(gpio_num_t mosi, gpio_num_t sclk)
+    : MySpi(SpiBusConfig{.mosi_io = mosi, .sclk_io = sclk}) {}
+
+MySpi::MySpi(gpio_num_t mosi, gpio_num_t sclk, spi_host_device_t host)
+    : MySpi(SpiBusConfig{.host = host, .mosi_io = mosi, .sclk_io = sclk}) {}
 
 esp_err_t MySpi::init() {
     if (s_initialized) return ESP_OK;
 
     /* 按 IDF v5.5 spi_bus_config_t 字段声明顺序初始化 */
     spi_bus_config_t buscfg = {};
-    buscfg.mosi_io_num = SPI_MOSI_PIN;
-    buscfg.miso_io_num = SPI_MISO_PIN;
-    buscfg.sclk_io_num = SPI_SCLK_PIN;
+    buscfg.mosi_io_num = m_cfg.mosi_io;
+    buscfg.miso_io_num = m_cfg.miso_io;
+    buscfg.sclk_io_num = m_cfg.sclk_io;
     buscfg.quadwp_io_num = -1;
     buscfg.quadhd_io_num = -1;
     buscfg.data4_io_num = -1;
     buscfg.data5_io_num = -1;
     buscfg.data6_io_num = -1;
     buscfg.data7_io_num = -1;
-    buscfg.max_transfer_sz = 320 * 240 * sizeof(uint16_t);
+    buscfg.max_transfer_sz = m_cfg.max_transfer_size;
 
-    ESP_ERROR_CHECK(spi_bus_initialize(MY_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    ESP_ERROR_CHECK(spi_bus_initialize(m_cfg.host, &buscfg, SPI_DMA_CH_AUTO));
 
     s_initialized = true;
     return ESP_OK;
@@ -36,7 +43,8 @@ esp_err_t MySpi::init() {
 extern "C" {
 
 esp_err_t my_spi_init(void) {
-    return MySpi::inst().init();
+    static MySpi spi;
+    return spi.init();
 }
 
 }

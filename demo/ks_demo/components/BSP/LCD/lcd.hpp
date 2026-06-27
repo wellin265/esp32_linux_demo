@@ -12,13 +12,18 @@
 #include "myspi.hpp"
 #include "tca9554.hpp"
 
-/* LCD 供电使能: TCA9554 P1 (初始化时已设为 HIGH, 不需额外操作) */
-#define LCD_PWR_ON()    Tca9554::inst().pinSetLevel(TCA9554_PIN_PWR, 1)
-
 /* LCD DC 引脚 (直连 GPIO 2)
    CS 由 SPI 驱动自动控制 (GPIO 46)
    硬件复位由 esp_lcd_panel_reset() 软件复位完成 */
-#define LCD_DC_GPIO     GPIO_NUM_2
+
+struct LcdPanelConfig {
+    gpio_num_t dc_io = GPIO_NUM_2;
+    gpio_num_t cs_io = GPIO_NUM_46;
+    uint32_t pclk_hz = 80 * 1000 * 1000;
+    uint16_t panel_width = 240;
+    uint16_t panel_height = 280;
+    uint8_t default_rotation = 1;  // landscape
+};
 
 /* LCD 旋转方向 (面板原生 240x280 竖屏) */
 #define LCD_ROTATION_PORTRAIT          0   /* 竖屏 240x280 */
@@ -60,9 +65,9 @@ typedef struct _lcd_config_t {
     esp_lcd_panel_io_color_trans_done_cb_t notify_flush_ready;
 } lcd_cfg_t;
 
-class Lcd : public MySpi {
+class Lcd {
 public:
-    static Lcd& inst();
+    Lcd(MySpi &spi, const LcdPanelConfig &dev_cfg = {});
     void init(lcd_cfg_t lcd_config);
     void clear(uint16_t color);
     void fill(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint16_t color);
@@ -76,15 +81,23 @@ public:
     void drawHLine(uint16_t x, uint16_t y, uint16_t len, uint16_t color);
     void drawCircle(uint16_t x0, uint16_t y0, uint8_t r, uint16_t color);
     void showChar(uint16_t x, uint16_t y, char chr, uint8_t size, uint8_t mode, uint16_t color);
+    void showString(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
+                    uint8_t size, const char *p, uint16_t color);
     lcd_obj_t& getDev();
     esp_lcd_panel_handle_t getPanelHandle();
 
 private:
-    Lcd() = default;
     static constexpr const char *TAG = "LCD";
+    MySpi &m_spi;
+    LcdPanelConfig m_dev_cfg;
     lcd_obj_t dev = {};
     esp_lcd_panel_handle_t panelHandle = nullptr;
+    esp_lcd_panel_io_handle_t ioHandle = nullptr;
     uint16_t backColor = 0xFFFF;
+    volatile bool refreshDone = false;
+
+    static bool onRefreshDone(esp_lcd_panel_io_handle_t panel_io,
+                              esp_lcd_panel_io_event_data_t *edata, void *user_ctx);
 };
 
 extern lcd_obj_t lcd_dev;
@@ -107,7 +120,7 @@ void lcd_draw_circle(uint16_t x0, uint16_t y0, uint8_t r, uint16_t color);
 void lcd_show_char(uint16_t x, uint16_t y, char chr, uint8_t size, uint8_t mode, uint16_t color);
 void lcd_show_num(uint16_t x, uint16_t y, uint32_t num, uint8_t len, uint8_t size, uint16_t color);
 void lcd_show_xnum(uint16_t x, uint16_t y, uint32_t num, uint8_t len, uint8_t size, uint8_t mode, uint16_t color);
-void lcd_show_string(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t size, char *p, uint16_t color);
+void lcd_show_string(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t size, const char *p, uint16_t color);
 void lcd_draw_rectangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color);
 void lcd_app_show_mono_icos(uint16_t x, uint16_t y, uint8_t width, uint8_t height, uint8_t *icosbase, uint16_t color, uint16_t bkcolor);
 
