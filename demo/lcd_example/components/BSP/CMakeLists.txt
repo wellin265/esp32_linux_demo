@@ -10,7 +10,8 @@ set(include_dirs
 
 set(requires
             driver
-            esp_lcd)
+            esp_lcd
+            espressif__esp_lcd_ili9341)
 
 idf_component_register(SRC_DIRS ${src_dirs} INCLUDE_DIRS ${include_dirs} REQUIRES ${requires})
 
