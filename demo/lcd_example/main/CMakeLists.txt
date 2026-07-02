@@ -1,4 +1,22 @@
-idf_component_register(SRCS "main.cpp"
-                            "APP/lcd_example/lcd_example.cpp"
-                    INCLUDE_DIRS "."
-                            "APP/lcd_example")
+idf_component_register(
+    SRC_DIRS
+        "."
+        "APP"
+        "APP/BLE"
+        "APP/FREERTOS_DEMO"
+    INCLUDE_DIRS
+        "."
+        "APP"
+        "APP/BLE"
+        "APP/FREERTOS_DEMO"
+    REQUIRES
+        BSP
+        bt
+        driver
+        esp_hw_support
+        esp_psram
+        esp_timer
+        nvs_flash
+        spi_flash
+        esp_event
+        )

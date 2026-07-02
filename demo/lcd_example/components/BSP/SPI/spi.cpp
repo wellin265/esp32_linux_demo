@@ -33,15 +33,6 @@ esp_err_t Spi::init() {
 
     ESP_ERROR_CHECK(spi_bus_initialize(m_cfg.host, &buscfg, SPI_DMA_CH_AUTO));
 
-    /* 2. SD 卡设备 (保留原有配置) */
-    spi_device_interface_config_t devcfg = {};
-    devcfg.clock_speed_hz = m_cfg.clock_speed_hz;
-    devcfg.mode           = 0;
-    devcfg.spics_io_num   = m_cfg.pin_sd_cs;
-    devcfg.queue_size     = m_cfg.queue_size;
-
-    ESP_ERROR_CHECK(spi_bus_add_device(m_cfg.host, &devcfg, &m_sd_handle));
-
     m_initialized = true;
     ESP_LOGI(TAG, "SPI initialized");
     return ESP_OK;

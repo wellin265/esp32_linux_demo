@@ -72,6 +72,7 @@ public:
     void showXnum(uint16_t x, uint16_t y, uint32_t num, uint8_t len, uint8_t size, uint8_t mode, uint16_t color);
     void showString(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint8_t size, char *p, uint16_t color);
     void setDirection(uint8_t dir);
+    void setBgColor(uint16_t color);   /* 设置字符/字符串背景色 */
 
     /* DMA 同步标志 — on_color_trans_done 回调设置 */
     volatile bool refreshDone = false;
@@ -84,6 +85,7 @@ private:
 
     Spi                     &m_bus;
     LcdConfig                m_cfg;
+    uint16_t                 m_bgColor      = BLACK;   /* 文本背景色 */
     esp_lcd_panel_io_handle_t m_io_handle   = nullptr;
     esp_lcd_panel_handle_t    m_panel_handle = nullptr;
     bool                      m_initialized  = false;

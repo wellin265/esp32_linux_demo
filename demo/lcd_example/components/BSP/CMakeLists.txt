@@ -1,17 +1,20 @@
 set(src_dirs
             SPI
             LCD
+            WS2812
             )
 
 set(include_dirs
             SPI
             LCD
+            WS2812
             )
 
 set(requires
             driver
             esp_lcd
-            espressif__esp_lcd_ili9341)
+            espressif__esp_lcd_ili9341
+            led_strip)
 
 idf_component_register(SRC_DIRS ${src_dirs} INCLUDE_DIRS ${include_dirs} REQUIRES ${requires})
 

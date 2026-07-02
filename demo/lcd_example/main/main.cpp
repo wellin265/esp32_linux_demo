@@ -1,7 +1,10 @@
 #include "freertos/FreeRTOS.h"
+#include "freertos/projdefs.h"
 #include "freertos/task.h"
 #include "nvs_flash.h"
-#include "lcd_example.hpp"
+#include "lcd.hpp"
+#include "spi.hpp"
+#include "freertos_demo.hpp"
 
 extern "C" void app_main(void)
 {
@@ -11,5 +14,5 @@ extern "C" void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
-    lcd_example();
+    freertos_demo();
 }

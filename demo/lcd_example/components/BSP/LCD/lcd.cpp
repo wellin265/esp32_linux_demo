@@ -20,6 +20,23 @@ static const char *TAG = "LCD";
 /* SPI LCD 类型 (1=2.4寸, 0=1.3寸) */
 #define SPI_LCD_TYPE    1
 
+/* ========== 面板色道修正 ========== */
+
+/* 将标准 RGB565 颜色转换为面板实际数据格式
+ *
+ * 本面板子像素映射 (经实测):
+ *   标准 R 位 [15:11] → 面板 R 子像素 ✓
+ *   标准 G 位 [10:5]  → 面板 B 子像素
+ *   标准 B 位 [4:0]   → 面板 G 子像素
+ *
+ * 转换: ~color 取反后交换 G(6bit)↔B(5bit) 位 */
+static inline uint16_t panelColor(uint16_t color) {
+    uint16_t inv = ~color;
+    return (inv & 0xF800)          /* R 保持 */
+         | ((inv & 0x001F) << 6)   /* B → G 位 */
+         | ((inv & 0x07E0) >> 5);  /* G → B 位 */
+}
+
 /* ========== DMA 回调 ========== */
 
 static bool onRefreshDone(esp_lcd_panel_io_handle_t panel_io,
@@ -109,6 +126,10 @@ esp_err_t Lcd::init() {
 
 /* ========== 显示方向 ========== */
 
+void Lcd::setBgColor(uint16_t color) {
+    m_bgColor = color;
+}
+
 void Lcd::setDirection(uint8_t dir) {
     m_cfg.dir = dir;
 
@@ -130,7 +151,6 @@ void Lcd::setDirection(uint8_t dir) {
 void Lcd::clear(uint16_t color) {
     uint16_t *buffer = (uint16_t *)heap_caps_malloc(
         m_cfg.width * sizeof(uint16_t) * 40, MALLOC_CAP_DMA);
-    uint16_t color_tmp = ~color;
 
     if (NULL == buffer) {
         ESP_LOGE(TAG, "Memory for bitmap is not enough");
@@ -138,7 +158,7 @@ void Lcd::clear(uint16_t color) {
     }
 
     for (uint32_t i = 0; i < m_cfg.width * 40; i++) {
-        buffer[i] = color_tmp;
+        buffer[i] = panelColor(color);
     }
 
     for (uint16_t y = 0; y < m_cfg.height; y += 40) {
@@ -163,7 +183,6 @@ void Lcd::fill(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint16_t colo
 
     uint16_t *buffer = (uint16_t *)heap_caps_malloc(
         width * sizeof(uint16_t), MALLOC_CAP_DMA);
-    uint16_t color_tmp = ~color;
 
     if (NULL == buffer) {
         ESP_LOGE(TAG, "Memory for bitmap is not enough");
@@ -171,7 +190,7 @@ void Lcd::fill(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint16_t colo
     }
 
     for (uint16_t i = 0; i < width; i++) {
-        buffer[i] = color_tmp;
+        buffer[i] = panelColor(color);
     }
 
     for (uint16_t y = 0; y < height; y++) {
@@ -202,7 +221,7 @@ void Lcd::block(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint16_t *co
     }
 
     for (uint16_t i = 0; i < width; i++) {
-        buffer[i] = ~color_buf[i];
+        buffer[i] = panelColor(color_buf[i]);
     }
 
     for (uint16_t y = 0; y < height; y++) {
@@ -221,7 +240,7 @@ void Lcd::block(uint16_t sx, uint16_t sy, uint16_t ex, uint16_t ey, uint16_t *co
 /* ========== 画点 ========== */
 
 void Lcd::drawPoint(uint16_t x, uint16_t y, uint16_t color) {
-    uint16_t color_tmp = ~color;
+    uint16_t color_tmp = panelColor(color);
     esp_lcd_panel_draw_bitmap(m_panel_handle, x, y, x + 1, y + 1, &color_tmp);
 }
 
@@ -364,7 +383,7 @@ void Lcd::showChar(uint16_t x, uint16_t y, uint8_t chr, uint8_t size,
 
     uint16_t *pcolor = (uint16_t *)heap_caps_malloc(
         size * (size / 2) * 2, MALLOC_CAP_DMA);
-    uint16_t color_tmp = ~color;
+    uint16_t color_tmp = panelColor(color);
 
     if (NULL == pcolor) {
         ESP_LOGE(TAG, "Memory for bitmap is not enough");
@@ -406,7 +425,7 @@ void Lcd::showChar(uint16_t x, uint16_t y, uint8_t chr, uint8_t size,
             if ((byte_code & 0x80) != 0) {
                 colortemp = color_tmp;
             } else if (mode == 0) {
-                colortemp = 0xFFFF;
+                colortemp = panelColor(m_bgColor);
             }
 
             pcolor[pix_index] = colortemp;
