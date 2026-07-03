@@ -1,0 +1,38 @@
+dependencies:
+  78/esp-wifi-connect:
+    component_hash: b3e275e7848647b4c1e908b8275f913c46d152570a391b99def7e51e96e12c29
+    dependencies:
+    - matches:
+      - if: idf_version >=6.0
+      name: espressif/cjson
+      registry_url: https://components.espressif.com
+      require: private
+      version: ^1.7.19
+    - name: idf
+      require: private
+      version: '>=5.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.2.1
+  espressif/led_strip:
+    component_hash: 28621486f77229aaf81c71f5e15d6fbf36c2949cf11094e07090593e659e7639
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 3.0.3
+  idf:
+    source:
+      type: idf
+    version: 5.5.4
+direct_dependencies:
+- 78/esp-wifi-connect
+- espressif/led_strip
+- idf
+manifest_hash: 98d77b76ff649e0e60e706a8ba012954fbf58b7d878d017157c03ee2f193de89
+target: esp32s3
+version: 2.0.0

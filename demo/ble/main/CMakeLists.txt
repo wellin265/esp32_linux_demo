@@ -1,0 +1,25 @@
+idf_component_register(
+    SRC_DIRS
+        "."
+        "APP"
+        "APP/BLE"
+        "APP/FREERTOS_DEMO"
+        "APP/WIFI"
+    INCLUDE_DIRS
+        "."
+        "APP"
+        "APP/BLE"
+        "APP/FREERTOS_DEMO"
+        "APP/WIFI"
+    REQUIRES
+        BSP
+        bt
+        driver
+        esp_hw_support
+        esp_psram
+        esp_timer
+        nvs_flash
+        spi_flash
+        esp_event
+        esp-wifi-connect
+        )
